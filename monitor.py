@@ -1,7 +1,7 @@
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from checker import check_url
-from db import init_db, save_check
+from db import init_db, save_check, update_incident
 
 URLS = [
     "https://httpbin.org/status/200",
@@ -14,8 +14,12 @@ def run_checks():
     for url in URLS: 
         result = check_url(url,slow_ms=4000)
         save_check(result)
-        print(f"{url}->{result['result']} ({result['response_ms']})")
-
+        event=update_incident(url)
+        if event == "opened":
+            print(f" !!!ALERT : {url} is DOWN")
+        elif event == "resolved":
+            print(f" K : {url} has recovered")
+        print(f"  {url} -> {result['result']} | code={result['status_code']} | error={result['error']} | {result['response_ms']} ms")
 if __name__ == "__main__":
     init_db()
     run_checks()
