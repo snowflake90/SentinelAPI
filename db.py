@@ -100,8 +100,42 @@ def get_incidents():
     conn.close()
     return [dict(row) for row in rows]
 
+def get_history(url, limit=50):
+    conn= get_connection()
+    rows=conn.execute(
+        "SELECT checked_at, status_code, response_ms, result, error "
+        "FROM checks WHERE url =? ORDER BY id DESC LIMIT?"
+        (url, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in reversed(rows)]
+
+def get_status():
+    """Latest result and overall uptime for every URL."""
+    conn= get_connection()
+    urls=[row["url"] for row in conn.execute("SELECT DISTINCT url FROM checks")]
+    status=[]
+    for url in urls:
+        last=conn.execute(
+            "SELECT *FROM checks WHERE url = ? ORDER BY id DESC LIMIT 1", (url,)
+        ).fetchone()
+        counts = conn.execute(
+            "SELECT COUNT(*) AS total, SUM(result!='down') AS up FROM checks WHERE url = ?", (url,)
+        )
+        status.append({
+            "url": url,
+            "result":last["result"],
+            "status_code":last["status_code"],
+            "response_ms":last["response_ms"],
+            "error":last["error"],
+            "last_checked": last["checked_at"],
+            "uptime_pct": round(100*counts["up"]/counts["total"],1),
+        })
+    conn.close()
+    return status
 
 if __name__=="__main__":
+
     from checker import check_url
 
     init_db()
