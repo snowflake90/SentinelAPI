@@ -104,7 +104,7 @@ def get_history(url, limit=50):
     conn= get_connection()
     rows=conn.execute(
         "SELECT checked_at, status_code, response_ms, result, error "
-        "FROM checks WHERE url =? ORDER BY id DESC LIMIT?"
+        "FROM checks WHERE url =? ORDER BY id DESC LIMIT?",
         (url, limit),
     ).fetchall()
     conn.close()
@@ -121,7 +121,7 @@ def get_status():
         ).fetchone()
         counts = conn.execute(
             "SELECT COUNT(*) AS total, SUM(result!='down') AS up FROM checks WHERE url = ?", (url,)
-        )
+        ).fetchone()
         status.append({
             "url": url,
             "result":last["result"],
