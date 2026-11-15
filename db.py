@@ -30,6 +30,15 @@ def init_db():
         reason TEXT
         )
     """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS endpoints (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL UNIQUE,
+        timeout_s REAL NOT NULL DEFAULT 5,
+        slow_ms INTEGER NOT NULL DEFAULT 4000
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -113,12 +122,14 @@ def get_history(url, limit=50):
 def get_status():
     """Latest result and overall uptime for every URL."""
     conn= get_connection()
-    urls=[row["url"] for row in conn.execute("SELECT DISTINCT url FROM checks")]
+    urls = [row["url"] for row in conn.execute("SELECT url FROM endpoints ORDER BY id")]
     status=[]
     for url in urls:
         last=conn.execute(
             "SELECT *FROM checks WHERE url = ? ORDER BY id DESC LIMIT 1", (url,)
         ).fetchone()
+        if last is None:
+            continue
         counts = conn.execute(
             "SELECT COUNT(*) AS total, SUM(result!='down') AS up FROM checks WHERE url = ?", (url,)
         ).fetchone()
@@ -133,6 +144,37 @@ def get_status():
         })
     conn.close()
     return status
+
+def add_endpoint(name, url, timeout_s=5, slow_ms=4000):
+    """Returns True if added, False if the URL already exists."""
+    conn=get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO endpoints (name, url, timeout_s, slow_ms) VALUES (?,?,?,?)",
+            (name, url, timeout_s, slow_ms),
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()  
+
+def get_endpoints():
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM endpoints ORDER BY id").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def delete_endpoint(endpoint_id):
+    """"Return True if a row was deleted"""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM endpoints WHERE id =?", (endpoint_id,))
+    conn.commit()
+    deleted = cur.rowcount > 0
+    conn.close()
+    return deleted
+
 
 if __name__=="__main__":
 
