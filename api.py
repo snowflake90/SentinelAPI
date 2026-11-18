@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from datetime import datetime
 
 from checker import check_url
 from db import (add_endpoint, delete_endpoint, get_checks, get_endpoints, get_history, get_incidents, get_status, init_db, save_check, update_incident)
@@ -73,4 +74,19 @@ def history(url: str, limit: int = 50):
 @app.get("/incidents")
 def incidents():
     return get_incidents()
-           
+
+@app.get("/health-report")
+def health_report():
+    s = get_status()
+    open_incidents = [i for i in get_incidents() if i["resolved_at"] is None]
+    return {
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "summary": {
+            "total": len(s),
+            "healthy": sum(x["result"] == "healthy" for x in s),
+            "slow": sum(x["result"] == "slow" for x in s),
+            "down": sum(x["result"] == "down" for x in s),
+        },
+        "open_incidents": open_incidents,
+        "endpoints": s,
+    }
